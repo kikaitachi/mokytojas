@@ -5,8 +5,6 @@ static int screen_height = 800;
 
 static GtkWidget *windows[] = { NULL, NULL, NULL, NULL };
 
-static GdkRectangle screen_rect;
-
 static GtkWidget *create_header_bar(char* title) {
 	GtkWidget *header_bar = gtk_header_bar_new();
 
@@ -42,7 +40,7 @@ static GtkWidget *create_window(GtkApplication* app, char* title, GtkWidget *con
 	//GdkPixbuf * icon_title = gdk_pixbuf_new_from_inline(-1, icon, FALSE, NULL);
 	//gtk_window_set_icon(window, icon_title);
 	// TODO: implement proper solution
-	gtk_window_set_icon_from_file(GTK_WINDOW (window), "/home/mechanikas/Archyvas/projects/mokytojas/icon.svg", NULL);
+	gtk_window_set_icon_from_file(GTK_WINDOW (window), "resource:///com/kikaitachi/mokytojas/icon.svg", NULL);
 
 	return window;
 }
@@ -53,14 +51,21 @@ static void activate(GtkApplication* app, gpointer user_data) {
 		//gtk_widget_show_all(windows[0]);
 		//gtk_window_get_size (GTK_WINDOW (windows[0]), &screen_width, &screen_height);
 		//gtk_window_unmaximize(windows[0]);
-		gtk_window_move(GTK_WINDOW(windows[0]), 0, 0);
+		GdkScreen *screen = gtk_window_get_screen(GTK_WINDOW(windows[0]));
+		printf ("W: %u x H:%u\n", gdk_screen_get_width(screen), gdk_screen_get_height(screen));
+		GdkDisplay *display = gdk_screen_get_display (screen);
+		GdkMonitor *monitor = gdk_display_get_primary_monitor (display);
+		GdkRectangle workarea;
+		gdk_monitor_get_workarea(monitor, &workarea);
+		printf ("X: %u, Y: %u, W: %u x H:%u\n", workarea.x, workarea.y, workarea.width, workarea.height);
+		gtk_window_move(GTK_WINDOW(windows[0]), workarea.x, workarea.y);
 		windows[1] = create_window(app, "Control", NULL);
-		gtk_window_set_default_size(GTK_WINDOW(windows[0]), screen_width / 2, screen_height / 2);
-		gtk_window_move(GTK_WINDOW(windows[1]), screen_width / 2, 0);
+		gtk_window_set_default_size(GTK_WINDOW(windows[0]), workarea.x + workarea.width / 2, workarea.height / 2);
+		gtk_window_move(GTK_WINDOW(windows[1]), workarea.width / 2, workarea.y);
 		windows[2] = create_window(app, "SLAM", NULL);
-		gtk_window_move(GTK_WINDOW(windows[2]), 0, screen_height / 2);
+		gtk_window_move(GTK_WINDOW(windows[2]), workarea.x, workarea.y + workarea.height / 2);
 		windows[3] = create_window(app, "Video", NULL);
-		gtk_window_move(GTK_WINDOW(windows[3]), screen_width / 2, screen_height / 2);
+		gtk_window_move(GTK_WINDOW(windows[3]), workarea.x + workarea.width / 2, workarea.y + workarea.height / 2);
 	}
 
 	for (int i = 0; i < 4; i++) {
@@ -69,8 +74,6 @@ static void activate(GtkApplication* app, gpointer user_data) {
 }
 
 int main (int argc, char **argv) {
-	gdk_monitor_get_geometry(gdk_display_get_primary_monitor(gdk_display_get_default()), &screen_rect);
-	printf ("W: %u x H:%u\n", screen_rect.width, screen_rect.height);
 	GtkApplication *app = gtk_application_new ("com.kikaitachi.mokytojas", G_APPLICATION_FLAGS_NONE);
 	g_signal_connect (app, "activate", G_CALLBACK (activate), NULL);
 	int status = g_application_run (G_APPLICATION (app), argc, argv);
