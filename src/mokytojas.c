@@ -45,6 +45,7 @@ static GtkWidget *create_window(GtkApplication* app, char* title, GtkWidget *con
 	//gtk_window_set_icon(GTK_WINDOW (window), gdk_pixbuf_new_from_resource("com/kikaitachi/mokytojas/icon.svg", NULL));
 	gtk_window_set_icon(GTK_WINDOW (window), gdk_pixbuf_new_from_stream(
 		g_resource_open_stream(mokytojas_get_resource(), "/com/kikaitachi/mokytojas/icon.svg", G_RESOURCE_LOOKUP_FLAGS_NONE, NULL), NULL, NULL));
+	// TODO: Free the returned object with g_object_unref().
 
 	return window;
 }
