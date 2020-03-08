@@ -1,4 +1,5 @@
 #include <gtk/gtk.h>
+#include "resources.h"
 
 static int screen_width = 1500;
 static int screen_height = 800;
@@ -40,7 +41,10 @@ static GtkWidget *create_window(GtkApplication* app, char* title, GtkWidget *con
 	//GdkPixbuf * icon_title = gdk_pixbuf_new_from_inline(-1, icon, FALSE, NULL);
 	//gtk_window_set_icon(window, icon_title);
 	// TODO: implement proper solution
-	gtk_window_set_icon_from_file(GTK_WINDOW (window), "resource:///com/kikaitachi/mokytojas/icon.svg", NULL);
+	//gtk_window_set_icon_from_file(GTK_WINDOW (window), "resource:///com/kikaitachi/mokytojas/icon.svg", NULL);
+	//gtk_window_set_icon(GTK_WINDOW (window), gdk_pixbuf_new_from_resource("com/kikaitachi/mokytojas/icon.svg", NULL));
+	gtk_window_set_icon(GTK_WINDOW (window), gdk_pixbuf_new_from_stream(
+		g_resource_open_stream(mokytojas_get_resource(), "/com/kikaitachi/mokytojas/icon.svg", G_RESOURCE_LOOKUP_FLAGS_NONE, NULL), NULL, NULL));
 
 	return window;
 }
@@ -74,7 +78,12 @@ static void activate(GtkApplication* app, gpointer user_data) {
 }
 
 int main (int argc, char **argv) {
+	//g_resources_register(mokytojas_get_resource());
+	//gdk_pixbuf_new_from_file("resource:///com/kikaitachi/mokytojas/icon.svg", NULL);
+	//printf("Resource: %d", g_resource_get_info(mokytojas_get_resource(), "/com/kikaitachi/mokytojas/icon.svg",
+	//	G_RESOURCE_LOOKUP_FLAGS_NONE, NULL, NULL, NULL));
 	GtkApplication *app = gtk_application_new ("com.kikaitachi.mokytojas", G_APPLICATION_FLAGS_NONE);
+	//printf("Is null: %d?", mokytojas_get_resource() == NULL);
 	g_signal_connect (app, "activate", G_CALLBACK (activate), NULL);
 	int status = g_application_run (G_APPLICATION (app), argc, argv);
 	g_object_unref (app);
