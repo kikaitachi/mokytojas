@@ -5,14 +5,13 @@ incdir = include_directories('include')
 gtk_dep = dependency('gtk+-3.0')
 
 gnome = import('gnome')
-asresources = gnome.compile_resources('as-resources',
+resources = gnome.compile_resources('resources',
   'mokytojas.gresource.xml',
-  source_dir: '.',
-  c_name: 'as')
+  source_dir: '.')
 
 executable('mokytojas',
 	['src/mokytojas.c'],
-	asresources,
+	resources,
 	dependencies: [gtk_dep],
 	include_directories: incdir,
 	override_options: ['c_std=c11'],
