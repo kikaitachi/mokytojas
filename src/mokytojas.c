@@ -1,15 +1,12 @@
 #include <gtk/gtk.h>
 #include "resources.h"
 
-static int screen_width = 1500;
-static int screen_height = 800;
+static GtkWidget *window_telemetry;
 
-static GtkWidget *windows[] = { NULL, NULL, NULL, NULL };
-
-static GtkWidget *create_header_bar(char* title) {
+static GtkWidget *create_header_bar() {
 	GtkWidget *header_bar = gtk_header_bar_new();
 
-	GMenu *menu_model = g_menu_new();
+	/*GMenu *menu_model = g_menu_new();
 	g_menu_append(menu_model, "Telemetry", NULL);
 	g_menu_append(menu_model, "Control", NULL);
 	g_menu_append(menu_model, "SLAM", NULL);
@@ -18,25 +15,41 @@ static GtkWidget *create_header_bar(char* title) {
 	GtkWidget *menu = gtk_menu_new_from_model((GMenuModel *)menu_model);
 
 	GtkWidget *menu_button = gtk_menu_button_new();
-	gtk_menu_button_set_popup(GTK_MENU_BUTTON (menu_button), menu);
+	gtk_menu_button_set_popup(GTK_MENU_BUTTON (menu_button), menu);*/
 
-
-	gtk_header_bar_set_title(GTK_HEADER_BAR(header_bar), title);
+	gtk_header_bar_set_title(GTK_HEADER_BAR(header_bar), "Telemetry");
 	gtk_header_bar_set_subtitle(GTK_HEADER_BAR(header_bar), "Disconnected");
 	gtk_header_bar_set_show_close_button(GTK_HEADER_BAR(header_bar), TRUE);
-	gtk_header_bar_pack_start(GTK_HEADER_BAR(header_bar), menu_button);
+	//gtk_header_bar_pack_start(GTK_HEADER_BAR(header_bar), menu_button);
 
 	return header_bar;
 }
 
-static GtkWidget *create_window(GtkApplication* app, char* title, GtkWidget *content) {
+static GtkWidget *create_window(GtkApplication* app, GtkWidget *content) {
 	GtkWidget *window = gtk_application_window_new (app);
-	gtk_window_set_titlebar(GTK_WINDOW(window), create_header_bar(title));
+	gtk_window_set_titlebar(GTK_WINDOW(window), create_header_bar());
 
-	GtkWidget *button = gtk_button_new_with_label ("Hello, World!");
+	GtkTreeStore *tree_store = gtk_tree_store_new(3, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_STRING);
 
-	g_signal_connect_swapped (button, "clicked", G_CALLBACK (gtk_widget_destroy), window);
-	gtk_container_add (GTK_CONTAINER (window), button);
+	GtkWidget *tree_view = gtk_tree_view_new_with_model(GTK_TREE_MODEL(tree_store));
+
+	GtkCellRenderer *renderer = gtk_cell_renderer_text_new();
+
+	GtkTreeViewColumn *column_sensor_or_actuator = gtk_tree_view_column_new_with_attributes(
+		"Sensor or actuator", renderer, "text", 0, NULL);
+
+	GtkTreeViewColumn *column_value = gtk_tree_view_column_new_with_attributes(
+		"Value or state", renderer, "text", 1, NULL);
+
+	GtkTreeViewColumn *column_actions = gtk_tree_view_column_new_with_attributes(
+		"Actions", renderer, "text", 2, NULL);
+
+	gtk_tree_view_append_column(GTK_TREE_VIEW(tree_view), column_sensor_or_actuator);
+	gtk_tree_view_append_column(GTK_TREE_VIEW(tree_view), column_value);
+	gtk_tree_view_append_column(GTK_TREE_VIEW(tree_view), column_actions);
+
+	//g_signal_connect_swapped (button, "clicked", G_CALLBACK (gtk_widget_destroy), window);
+	gtk_container_add (GTK_CONTAINER (window), tree_view);
 
 	//GdkPixbuf * icon_title = gdk_pixbuf_new_from_inline(-1, icon, FALSE, NULL);
 	//gtk_window_set_icon(window, icon_title);
@@ -45,13 +58,20 @@ static GtkWidget *create_window(GtkApplication* app, char* title, GtkWidget *con
 	//gtk_window_set_icon(GTK_WINDOW (window), gdk_pixbuf_new_from_resource("com/kikaitachi/mokytojas/icon.svg", NULL));
 	gtk_window_set_icon(GTK_WINDOW (window), gdk_pixbuf_new_from_stream(
 		g_resource_open_stream(mokytojas_get_resource(), "/com/kikaitachi/mokytojas/icon.svg", G_RESOURCE_LOOKUP_FLAGS_NONE, NULL), NULL, NULL));
-	// TODO: Free the returned object with g_object_unref().
+	// TODO: Free the returned object with g_object_unref()
+	gtk_window_set_default_size(GTK_WINDOW(window), 800, 600);
+
+	GtkTreeIter iter;
+	gtk_tree_store_append(tree_store, &iter, NULL);
+	gtk_tree_store_set(tree_store, &iter, 0, "Temperature", -1);
+	gtk_tree_store_append(tree_store, &iter, NULL);
+	gtk_tree_store_set(tree_store, &iter, 0, "Voltage", -1);
 
 	return window;
 }
 
 static void activate(GtkApplication* app, gpointer user_data) {
-	if (windows[0] == NULL) {
+	/*if (windows[0] == NULL) {
 		windows[0] = create_window(app, "Telemetry", NULL);
 		//gtk_widget_show_all(windows[0]);
 		//gtk_window_get_size (GTK_WINDOW (windows[0]), &screen_width, &screen_height);
@@ -75,7 +95,9 @@ static void activate(GtkApplication* app, gpointer user_data) {
 
 	for (int i = 0; i < 4; i++) {
 		gtk_widget_show_all(windows[i]);
-	}
+	}*/
+	window_telemetry = create_window(app, NULL);
+	gtk_widget_show_all(window_telemetry);
 }
 
 int main (int argc, char **argv) {
