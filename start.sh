@@ -10,6 +10,7 @@ git pull
 [[ -d builddir ]] || meson builddir
 
 # Build
+meson subprojects update
 ninja -C builddir
 
 # Update address and port of target robot
