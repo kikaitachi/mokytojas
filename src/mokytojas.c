@@ -123,11 +123,18 @@ gboolean network_data_available_callback(GIOChannel *source, GIOCondition condit
 		printf("\n");
 		char *buf_ptr = &buf;
 		int buf_len = result;
-		int number;
-		while (kt_msg_read_int(&buf_ptr, &buf_len, &number) != -1) {
-			printf(" %d", number);
-		}
-		printf("\n");
+		int value_int;
+		float value_float;
+		int str_len;
+		enum KT_MESSAGE msg_type;
+		kt_msg_read_int(&buf_ptr, &buf_len, &msg_type);
+		kt_msg_read_int(&buf_ptr, &buf_len, &value_int);
+		kt_msg_read_float(&buf_ptr, &buf_len, &value_float);
+		kt_msg_read_int(&buf_ptr, &buf_len, &str_len);
+		char string[str_len + 1];
+		string[str_len] = 0;
+		kt_msg_read(&buf_ptr, &buf_len, string, str_len);
+		printf("Type: %d, int: %d, float: %f, str len: %d, str: %s\n", msg_type, value_int, value_float, str_len, string);
 	}
 	return TRUE;
 }
