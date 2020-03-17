@@ -4,6 +4,8 @@
 
 static GtkWidget *window_telemetry;
 
+static int client_socket;
+
 static GtkWidget *create_header_bar() {
 	GtkWidget *header_bar = gtk_header_bar_new();
 
@@ -107,17 +109,45 @@ static void activate(GtkApplication* app, gpointer user_data) {
 	gtk_widget_show_all(window_telemetry);
 }
 
+gboolean network_data_available_callback(GIOChannel *source, GIOCondition condition, gpointer data) {
+	int fd = g_io_channel_unix_get_fd(source);
+	char buf[KT_MAX_MSG_SIZE];
+	ssize_t result = recv(fd, buf, sizeof(buf), 0);
+	if (result == -1) {
+		printf("Failed to receive packet\n");
+	} else {
+		printf("Received packet of size %zd:", result);
+		for (int i = 0; i < result; i++) {
+			printf(" %d", buf[i]);
+		}
+		printf("\n");
+		char *buf_ptr = &buf;
+		int buf_len = result;
+		int number;
+		while (kt_msg_read_int(&buf_ptr, &buf_len, &number) != -1) {
+			printf(" %d", number);
+		}
+		printf("\n");
+	}
+	return TRUE;
+}
+
 int main (int argc, char **argv) {
-	int socket = kt_connect(argv[1], argv[2]);
-	//g_resources_register(mokytojas_get_resource());
-	//gdk_pixbuf_new_from_file("resource:///com/kikaitachi/mokytojas/icon.svg", NULL);
-	//printf("Resource: %d", g_resource_get_info(mokytojas_get_resource(), "/com/kikaitachi/mokytojas/icon.svg",
-	//	G_RESOURCE_LOOKUP_FLAGS_NONE, NULL, NULL, NULL));
-	GtkApplication *app = gtk_application_new ("com.kikaitachi.mokytojas", G_APPLICATION_FLAGS_NONE);
-	//printf("Is null: %d?", mokytojas_get_resource() == NULL);
-	g_signal_connect (app, "activate", G_CALLBACK (activate), NULL);
-	int status = g_application_run (G_APPLICATION (app), 1, argv);
-	g_object_unref (app);
+	int server_socket = kt_udp_bind(argv[1]);
+	if (server_socket == -1) {
+		kt_log_last("Failed to create server socket");
+		return -1;
+	}
+	client_socket = kt_udp_connect(argv[2], argv[3]);
+	if (client_socket == -1) {
+		kt_log_last("Failed to create client socket");
+		return -1;
+	}
+	g_io_add_watch(g_io_channel_unix_new(server_socket), G_IO_IN, &network_data_available_callback, NULL);
+	GtkApplication *app = gtk_application_new("com.kikaitachi.mokytojas", G_APPLICATION_FLAGS_NONE);
+	g_signal_connect(app, "activate", G_CALLBACK(activate), NULL);
+	int status = g_application_run(G_APPLICATION (app), 1, argv);
+	g_object_unref(app);
 	return status;
 }
 
