@@ -1,4 +1,5 @@
 #include <gtk/gtk.h>
+#include "kikaitachi.h"
 #include "resources.h"
 
 static GtkWidget *window_telemetry;
@@ -61,11 +62,17 @@ static GtkWidget *create_window(GtkApplication* app, GtkWidget *content) {
 	// TODO: Free the returned object with g_object_unref()
 	gtk_window_set_default_size(GTK_WINDOW(window), 800, 600);
 
-	GtkTreeIter iter;
+	GtkTreeIter iter, parent;
 	gtk_tree_store_append(tree_store, &iter, NULL);
 	gtk_tree_store_set(tree_store, &iter, 0, "Temperature", -1);
 	gtk_tree_store_append(tree_store, &iter, NULL);
 	gtk_tree_store_set(tree_store, &iter, 0, "Voltage", -1);
+	gtk_tree_store_append(tree_store, &parent, NULL);
+	gtk_tree_store_set(tree_store, &parent, 0, "Dynamixel XM430-W350-T", -1);
+	gtk_tree_store_append(tree_store, &iter, &parent);
+	gtk_tree_store_set(tree_store, &iter, 0, "Temperature 1", -1);
+	gtk_tree_store_append(tree_store, &iter, &parent);
+	gtk_tree_store_set(tree_store, &iter, 0, "Voltage 1", -1);
 
 	return window;
 }
@@ -101,6 +108,7 @@ static void activate(GtkApplication* app, gpointer user_data) {
 }
 
 int main (int argc, char **argv) {
+	int socket = kt_connect(argv[1], argv[2]);
 	//g_resources_register(mokytojas_get_resource());
 	//gdk_pixbuf_new_from_file("resource:///com/kikaitachi/mokytojas/icon.svg", NULL);
 	//printf("Resource: %d", g_resource_get_info(mokytojas_get_resource(), "/com/kikaitachi/mokytojas/icon.svg",
@@ -108,7 +116,7 @@ int main (int argc, char **argv) {
 	GtkApplication *app = gtk_application_new ("com.kikaitachi.mokytojas", G_APPLICATION_FLAGS_NONE);
 	//printf("Is null: %d?", mokytojas_get_resource() == NULL);
 	g_signal_connect (app, "activate", G_CALLBACK (activate), NULL);
-	int status = g_application_run (G_APPLICATION (app), argc, argv);
+	int status = g_application_run (G_APPLICATION (app), 1, argv);
 	g_object_unref (app);
 	return status;
 }

@@ -1,0 +1,4 @@
+[wrap-git]
+url = git@github.com:kikaitachi/libkikaitachi.git
+revision = master
+
