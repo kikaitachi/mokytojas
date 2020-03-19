@@ -227,6 +227,7 @@ void on_activate(GtkApplication* app, gpointer user_data) {
 		}
 		g_io_add_watch(g_io_channel_unix_new(server_socket), G_IO_IN, &on_new_message, NULL);
 		window_telemetry = create_window(app, NULL);
+		gtk_window_set_position(window_telemetry, GTK_WIN_POS_CENTER_ALWAYS);
 		gtk_widget_show_all(GTK_WIDGET(window_telemetry));
 	} else {
 		gtk_window_present(window_telemetry);
