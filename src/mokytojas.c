@@ -131,30 +131,37 @@ static void activate(GtkApplication* app, gpointer user_data) {
 	gtk_widget_show_all(window_telemetry);
 }
 
-gboolean network_data_available_callback(GIOChannel *source, GIOCondition condition, gpointer data) {
+void handle_telemetry_message(void *buf_ptr, int buf_len) {
+	int telemetry_id;
+	float battery_voltage;
+	kt_msg_read_int(&buf_ptr, &buf_len, &telemetry_id);
+	kt_msg_read_float(&buf_ptr, &buf_len, &battery_voltage);
+	/*char string[str_len + 1];
+	string[str_len] = 0;
+	kt_msg_read(&buf_ptr, &buf_len, string, str_len);*/
+	kt_log_debug("Id: %d, battery: %f", telemetry_id, battery_voltage);
+}
+
+gboolean on_new_message(GIOChannel *source, GIOCondition condition, gpointer data) {
 	int fd = g_io_channel_unix_get_fd(source);
 	char buf[KT_MAX_MSG_SIZE];
 	ssize_t result = recv(fd, buf, sizeof(buf), 0);
 	if (result == -1) {
-		printf("Failed to receive packet\n");
+		kt_log_last("Failed to receive UDP packet");
 	} else {
-		printf("Received packet of size %zd:", result);
-		for (int i = 0; i < result; i++) {
-			printf(" %d", buf[i]);
-		}
-		printf("\n");
-		char *buf_ptr = &buf;
+		kt_log_debug("Received packet of %zd bytes", result);
+		void *buf_ptr = &buf;
 		int buf_len = result;
-		enum KT_MESSAGE msg_type;
-		int telemetry_id;
-		float battery_voltage;
+		int msg_type;
 		kt_msg_read_int(&buf_ptr, &buf_len, &msg_type);
-		kt_msg_read_int(&buf_ptr, &buf_len, &telemetry_id);
-		kt_msg_read_float(&buf_ptr, &buf_len, &battery_voltage);
-		/*char string[str_len + 1];
-		string[str_len] = 0;
-		kt_msg_read(&buf_ptr, &buf_len, string, str_len);*/
-		printf("Type: %d, id: %d, battery: %f\n", msg_type, telemetry_id, battery_voltage);
+		switch (msg_type) {
+			case KT_MSG_TELEMETRY:
+				handle_telemetry_message(buf_ptr, buf_len);
+				break;
+			default:
+				kt_log_error ("Received message of unknown type: %d", msg_type);
+				break;
+		}
 	}
 	return TRUE;
 }
@@ -170,7 +177,7 @@ int main (int argc, char **argv) {
 		kt_log_last("Failed to create client socket");
 		return -1;
 	}
-	g_io_add_watch(g_io_channel_unix_new(server_socket), G_IO_IN, &network_data_available_callback, NULL);
+	g_io_add_watch(g_io_channel_unix_new(server_socket), G_IO_IN, &on_new_message, NULL);
 	GtkApplication *app = gtk_application_new("com.kikaitachi.mokytojas", G_APPLICATION_FLAGS_NONE);
 	g_signal_connect(app, "activate", G_CALLBACK(activate), NULL);
 	int status = g_application_run(G_APPLICATION (app), 1, argv);

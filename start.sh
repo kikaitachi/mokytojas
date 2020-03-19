@@ -14,5 +14,5 @@ meson subprojects update
 ninja -C builddir
 
 # Update address and port of target robot
-builddir/mokytojas 7211 192.168.1.3 7210
+builddir/mokytojas 7211 192.168.1.4 7210
 
