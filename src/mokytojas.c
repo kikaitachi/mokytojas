@@ -1,8 +1,11 @@
 #include <gtk/gtk.h>
 #include "kikaitachi.h"
 #include "resources.h"
+#include "telemetry.h"
 
 static GtkWindow *window_telemetry;
+
+static GtkTreeStore *telemetry_tree;
 
 static int client_socket;
 
@@ -50,24 +53,29 @@ static GtkWindow *create_window(GtkApplication* app, GtkWidget *content) {
 	GtkWindow *window = GTK_WINDOW(gtk_application_window_new(app));
 	gtk_window_set_titlebar(window, create_header_bar());
 
-	GtkTreeStore *tree_store = gtk_tree_store_new(3, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_STRING);
+	// id, name, type, value, key to press, key to release
+	telemetry_tree = gtk_tree_store_new(6, G_TYPE_INT, G_TYPE_STRING, G_TYPE_INT, G_TYPE_STRING, G_TYPE_INT, G_TYPE_INT);
 
-	GtkWidget *tree_view = gtk_tree_view_new_with_model(GTK_TREE_MODEL(tree_store));
+	GtkWidget *tree_view = gtk_tree_view_new_with_model(GTK_TREE_MODEL(telemetry_tree));
 
 	GtkCellRenderer *renderer = gtk_cell_renderer_text_new();
 
 	GtkTreeViewColumn *column_sensor_or_actuator = gtk_tree_view_column_new_with_attributes(
-		"Sensor or actuator", renderer, "text", 0, NULL);
+		"Sensor or actuator", renderer, "text", 1, NULL);
 
 	GtkTreeViewColumn *column_value = gtk_tree_view_column_new_with_attributes(
-		"Value or state", renderer, "text", 1, NULL);
+		"Value or state", renderer, "text", 3, NULL);
 
-	GtkTreeViewColumn *column_actions = gtk_tree_view_column_new_with_attributes(
-		"Actions", renderer, "text", 2, NULL);
+	GtkTreeViewColumn *column_key_press = gtk_tree_view_column_new_with_attributes(
+		"On key press", renderer, "text", 4, NULL);
+
+	GtkTreeViewColumn *column_key_release = gtk_tree_view_column_new_with_attributes(
+		"On key release", renderer, "text", 5, NULL);
 
 	gtk_tree_view_append_column(GTK_TREE_VIEW(tree_view), column_sensor_or_actuator);
 	gtk_tree_view_append_column(GTK_TREE_VIEW(tree_view), column_value);
-	gtk_tree_view_append_column(GTK_TREE_VIEW(tree_view), column_actions);
+	gtk_tree_view_append_column(GTK_TREE_VIEW(tree_view), column_key_press);
+	gtk_tree_view_append_column(GTK_TREE_VIEW(tree_view), column_key_release);
 
 	//g_signal_connect_swapped (button, "clicked", G_CALLBACK (gtk_widget_destroy), window);
 	gtk_container_add (GTK_CONTAINER (window), tree_view);
@@ -77,12 +85,12 @@ static GtkWindow *create_window(GtkApplication* app, GtkWidget *content) {
 	// TODO: implement proper solution
 	//gtk_window_set_icon_from_file(GTK_WINDOW (window), "resource:///com/kikaitachi/mokytojas/icon.svg", NULL);
 	//gtk_window_set_icon(GTK_WINDOW (window), gdk_pixbuf_new_from_resource("com/kikaitachi/mokytojas/icon.svg", NULL));
-	gtk_window_set_icon(GTK_WINDOW(window), gdk_pixbuf_new_from_stream(
+	gtk_window_set_icon(window, gdk_pixbuf_new_from_stream(
 		g_resource_open_stream(mokytojas_get_resource(), "/com/kikaitachi/mokytojas/icon.svg", G_RESOURCE_LOOKUP_FLAGS_NONE, NULL), NULL, NULL));
 	// TODO: Free the returned object with g_object_unref()
 	gtk_window_set_default_size(GTK_WINDOW(window), 800, 600);
 
-	GtkTreeIter iter, parent;
+	/*GtkTreeIter iter, parent;
 	gtk_tree_store_append(tree_store, &iter, NULL);
 	gtk_tree_store_set(tree_store, &iter, 0, "Temperature", -1);
 	gtk_tree_store_append(tree_store, &iter, NULL);
@@ -92,7 +100,7 @@ static GtkWindow *create_window(GtkApplication* app, GtkWidget *content) {
 	gtk_tree_store_append(tree_store, &iter, &parent);
 	gtk_tree_store_set(tree_store, &iter, 0, "Temperature 1", -1);
 	gtk_tree_store_append(tree_store, &iter, &parent);
-	gtk_tree_store_set(tree_store, &iter, 0, "Voltage 1", -1);
+	gtk_tree_store_set(tree_store, &iter, 0, "Voltage 1", -1);*/
 
 	//gtk_widget_add_events(GTK_WIDGET(window), GDK_KEY_RELEASE_MASK | GDK_KEY_PRESS_MASK);
 	g_signal_connect(G_OBJECT(window), "key-press-event", G_CALLBACK(on_key_pressed), NULL);
@@ -101,11 +109,45 @@ static GtkWindow *create_window(GtkApplication* app, GtkWidget *content) {
 	return window;
 }
 
+void handle_telemetry_definition_message(void *buf_ptr, int buf_len) {
+	GtkTreeIter iter, parent;
+	int id;
+	while (kt_msg_read_int(&buf_ptr, &buf_len, &id) != -1) {
+		int parent_id;
+		kt_msg_read_int(&buf_ptr, &buf_len, &parent_id);
+
+		int name_len;
+		kt_msg_read_int(&buf_ptr, &buf_len, &name_len);
+
+		//char name[name_len + 1];
+		char *name = malloc(name_len + 1);
+		kt_msg_read(&buf_ptr, &buf_len, name, name_len);
+		name[name_len] = 0;
+
+		int type;
+		kt_msg_read_int(&buf_ptr, &buf_len, &type);
+
+		kt_log_debug("id: %d, parent id: %d, name_len: %d, name: %s, type: %d",
+			  id, parent_id, name_len, name, type);
+
+		if (!find_tree_item_by_id(GTK_TREE_MODEL(telemetry_tree), &iter, id)) {
+			if (find_tree_item_by_id(GTK_TREE_MODEL(telemetry_tree), &parent, parent_id)) {
+				gtk_tree_store_append(telemetry_tree, &iter, &parent);
+				gtk_tree_store_set(telemetry_tree, &iter, 0, id, 1, name, -1);
+			} else {
+				gtk_tree_store_append(telemetry_tree, &iter, NULL);
+				gtk_tree_store_set(telemetry_tree, &iter, 0, id, 1, name, -1);
+			}
+		}
+		break;
+	}
+}
+
 void handle_telemetry_message(void *buf_ptr, int buf_len) {
 	int telemetry_id;
 	float battery_voltage;
 	while (kt_msg_read_int(&buf_ptr, &buf_len, &telemetry_id) != -1) {
-		//
+		// TODO: find definition
 		kt_msg_read_float(&buf_ptr, &buf_len, &battery_voltage);
 		kt_log_debug("Id: %d, battery: %f", telemetry_id, battery_voltage);
 	}
@@ -129,6 +171,9 @@ gboolean on_new_message(GIOChannel *source, GIOCondition condition, gpointer dat
 		switch (msg_type) {
 			case KT_MSG_TELEMETRY:
 				handle_telemetry_message(buf_ptr, buf_len);
+				break;
+			case KT_MSG_TELEMETRY_DEFINITION:
+				handle_telemetry_definition_message(buf_ptr, buf_len);
 				break;
 			default:
 				kt_log_error ("Received message of unknown type: %d", msg_type);

@@ -13,7 +13,7 @@ libkikaitachi_proj = subproject('libkikaitachi')
 libkikaitachi_dep = libkikaitachi_proj.get_variable('libkikaitachi_dep')
 
 executable('mokytojas',
-	['src/mokytojas.c'],
+	['src/mokytojas.c', 'src/telemetry.c'],
 	resources,
 	dependencies: [gtk_dep, libkikaitachi_dep],
 	include_directories: incdir,
