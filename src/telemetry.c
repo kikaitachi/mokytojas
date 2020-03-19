@@ -1,3 +1,4 @@
+#include <gtk/gtk.h>
 #include "telemetry.h"
 
 static gboolean tree_item_by_id(GtkTreeModel *model, GtkTreeIter *node, GtkTreeIter *result, int id) {

@@ -6,6 +6,7 @@
 static GtkWindow *window_telemetry;
 
 static GtkTreeStore *telemetry_tree;
+static GtkWidget *tree_view;
 
 static int client_socket;
 
@@ -56,7 +57,7 @@ static GtkWindow *create_window(GtkApplication* app, GtkWidget *content) {
 	// id, name, type, value, key to press, key to release
 	telemetry_tree = gtk_tree_store_new(6, G_TYPE_INT, G_TYPE_STRING, G_TYPE_INT, G_TYPE_STRING, G_TYPE_INT, G_TYPE_INT);
 
-	GtkWidget *tree_view = gtk_tree_view_new_with_model(GTK_TREE_MODEL(telemetry_tree));
+	tree_view = gtk_tree_view_new_with_model(GTK_TREE_MODEL(telemetry_tree));
 
 	GtkCellRenderer *renderer = gtk_cell_renderer_text_new();
 
@@ -133,23 +134,52 @@ void handle_telemetry_definition_message(void *buf_ptr, int buf_len) {
 		if (!find_tree_item_by_id(GTK_TREE_MODEL(telemetry_tree), &iter, id)) {
 			if (find_tree_item_by_id(GTK_TREE_MODEL(telemetry_tree), &parent, parent_id)) {
 				gtk_tree_store_append(telemetry_tree, &iter, &parent);
-				gtk_tree_store_set(telemetry_tree, &iter, 0, id, 1, name, -1);
+				gtk_tree_store_set(telemetry_tree, &iter, 0, id, 1, name, 2, type, -1);
 			} else {
 				gtk_tree_store_append(telemetry_tree, &iter, NULL);
-				gtk_tree_store_set(telemetry_tree, &iter, 0, id, 1, name, -1);
+				gtk_tree_store_set(telemetry_tree, &iter, 0, id, 1, name, 2, type, -1);
 			}
+			gtk_tree_view_expand_all(GTK_TREE_VIEW(tree_view));
 		}
 		break;
 	}
 }
 
 void handle_telemetry_message(void *buf_ptr, int buf_len) {
-	int telemetry_id;
-	float battery_voltage;
-	while (kt_msg_read_int(&buf_ptr, &buf_len, &telemetry_id) != -1) {
-		// TODO: find definition
-		kt_msg_read_float(&buf_ptr, &buf_len, &battery_voltage);
-		kt_log_debug("Id: %d, battery: %f", telemetry_id, battery_voltage);
+	int id;
+	float value_float;
+	while (kt_msg_read_int(&buf_ptr, &buf_len, &id) != -1) {
+		GtkTreeIter iter;
+		if (find_tree_item_by_id(GTK_TREE_MODEL(telemetry_tree), &iter, id)) {
+			GValue value = { 0, };
+			gtk_tree_model_get_value(GTK_TREE_MODEL(telemetry_tree), &iter, 2, &value);
+			int type = g_value_get_int(&value);
+			g_value_unset(&value);
+			switch (type) {
+				case KT_TELEMETRY_TYPE_FLOAT:
+					kt_msg_read_float(&buf_ptr, &buf_len, &value_float);
+					/*GValue value = { 0, };
+					gtk_tree_model_get_value(GTK_TREE_MODEL(telemetry_tree), &iter, 3, &value);
+					g_value_set_string(&value, "test");
+					g_value_unset(&value);*/
+					int len = snprintf(NULL, 0, "%f", value_float);
+					char *result = (char *)malloc(len + 1);
+					snprintf(result, len + 1, "%f", value_float);
+					gtk_tree_store_set(telemetry_tree, &iter, 3, result, -1);
+					break;
+				default:
+					kt_log_error("Received telemetry message with id %d and unknown type %d", id, type);
+					return;
+			}
+		} else {
+			kt_log_info("Received telemetry message with unknown id %d, requesting definitions", id);
+			char buf[KT_MAX_MSG_SIZE];
+			int buf_len = KT_MAX_MSG_SIZE;
+			void *buf_ptr = &buf;
+			kt_msg_write_int(&buf_ptr, &buf_len, KT_MSG_TELEMETRY_DEFINITION);
+			kt_udp_send(client_socket, buf, KT_MAX_MSG_SIZE - buf_len);
+			return;
+		}
 	}
 	/*char string[str_len + 1];
 	string[str_len] = 0;
