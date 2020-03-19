@@ -148,6 +148,8 @@ void handle_telemetry_definition_message(void *buf_ptr, int buf_len) {
 void handle_telemetry_message(void *buf_ptr, int buf_len) {
 	int id;
 	float value_float;
+	int value_int;
+	char value_string[KT_MAX_MSG_SIZE];
 	while (kt_msg_read_int(&buf_ptr, &buf_len, &id) != -1) {
 		GtkTreeIter iter;
 		if (find_tree_item_by_id(GTK_TREE_MODEL(telemetry_tree), &iter, id)) {
@@ -166,6 +168,12 @@ void handle_telemetry_message(void *buf_ptr, int buf_len) {
 					char *result = (char *)malloc(len + 1);
 					snprintf(result, len + 1, "%f", value_float);
 					gtk_tree_store_set(telemetry_tree, &iter, 3, result, -1);
+					break;
+				case KT_TELEMETRY_TYPE_STRING:
+					kt_msg_read_int(&buf_ptr, &buf_len, &value_int);
+					kt_msg_read(&buf_ptr, &buf_len, value_string, value_int);
+					value_string[value_int] = 0;
+					gtk_tree_store_set(telemetry_tree, &iter, 3, value_string, -1);
 					break;
 				default:
 					kt_log_error("Received telemetry message with id %d and unknown type %d", id, type);
