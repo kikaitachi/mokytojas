@@ -33,7 +33,7 @@ gboolean on_key_pressed(GtkWidget *widget, GdkEventKey *event, gpointer data) {
         kt_log_info ("Key pressed: %d", event->keyval);
         return TRUE;
     }
-	kt_log_info ("Key pressed but not handled: %d", event->keyval);
+	kt_log_info ("Key pressed but not handled: %d, %s", event->keyval, gdk_keyval_name(event->keyval));
     return FALSE;
 }
 
@@ -42,7 +42,7 @@ gboolean on_key_released(GtkWidget *widget, GdkEventKey *event, gpointer data) {
         printf("SPACE KEY PRESSED!");
         return TRUE;
     }*/
-	kt_log_info ("Key released: %d", event->keyval);
+	kt_log_info ("Key released: %d, %s", event->keyval, gdk_keyval_name(event->keyval));
     return FALSE;
 }
 
@@ -95,7 +95,7 @@ static GtkWidget *create_window(GtkApplication* app, GtkWidget *content) {
 	gtk_tree_store_set(tree_store, &iter, 0, "Voltage 1", -1);
 
 	//gtk_widget_add_events(GTK_WIDGET(window), GDK_KEY_RELEASE_MASK | GDK_KEY_PRESS_MASK);
-	g_signal_connect(G_OBJECT(window), "key_press_event", G_CALLBACK(on_key_pressed), NULL);
+	g_signal_connect(G_OBJECT(window), "key-press-event", G_CALLBACK(on_key_pressed), NULL);
 	g_signal_connect(G_OBJECT(window), "key-release-event", G_CALLBACK(on_key_released), NULL);
 
 	return window;
