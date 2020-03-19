@@ -2,7 +2,7 @@
 #include "kikaitachi.h"
 #include "resources.h"
 
-static GtkWidget *window_telemetry;
+static GtkWindow *window_telemetry;
 
 static int client_socket;
 
@@ -46,9 +46,9 @@ gboolean on_key_released(GtkWidget *widget, GdkEventKey *event, gpointer data) {
     return FALSE;
 }
 
-static GtkWidget *create_window(GtkApplication* app, GtkWidget *content) {
-	GtkWidget *window = gtk_application_window_new (app);
-	gtk_window_set_titlebar(GTK_WINDOW(window), create_header_bar());
+static GtkWindow *create_window(GtkApplication* app, GtkWidget *content) {
+	GtkWindow *window = GTK_WINDOW(gtk_application_window_new(app));
+	gtk_window_set_titlebar(window, create_header_bar());
 
 	GtkTreeStore *tree_store = gtk_tree_store_new(3, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_STRING);
 
@@ -101,45 +101,17 @@ static GtkWidget *create_window(GtkApplication* app, GtkWidget *content) {
 	return window;
 }
 
-static void activate(GtkApplication* app, gpointer user_data) {
-	/*if (windows[0] == NULL) {
-		windows[0] = create_window(app, "Telemetry", NULL);
-		//gtk_widget_show_all(windows[0]);
-		//gtk_window_get_size (GTK_WINDOW (windows[0]), &screen_width, &screen_height);
-		//gtk_window_unmaximize(windows[0]);
-		GdkScreen *screen = gtk_window_get_screen(GTK_WINDOW(windows[0]));
-		printf ("W: %u x H:%u\n", gdk_screen_get_width(screen), gdk_screen_get_height(screen));
-		GdkDisplay *display = gdk_screen_get_display (screen);
-		GdkMonitor *monitor = gdk_display_get_primary_monitor (display);
-		GdkRectangle workarea;
-		gdk_monitor_get_workarea(monitor, &workarea);
-		printf ("X: %u, Y: %u, W: %u x H:%u\n", workarea.x, workarea.y, workarea.width, workarea.height);
-		gtk_window_move(GTK_WINDOW(windows[0]), workarea.x, workarea.y);
-		windows[1] = create_window(app, "Control", NULL);
-		gtk_window_set_default_size(GTK_WINDOW(windows[0]), workarea.x + workarea.width / 2, workarea.height / 2);
-		gtk_window_move(GTK_WINDOW(windows[1]), workarea.width / 2, workarea.y);
-		windows[2] = create_window(app, "SLAM", NULL);
-		gtk_window_move(GTK_WINDOW(windows[2]), workarea.x, workarea.y + workarea.height / 2);
-		windows[3] = create_window(app, "Video", NULL);
-		gtk_window_move(GTK_WINDOW(windows[3]), workarea.x + workarea.width / 2, workarea.y + workarea.height / 2);
-	}
-
-	for (int i = 0; i < 4; i++) {
-		gtk_widget_show_all(windows[i]);
-	}*/
-	window_telemetry = create_window(app, NULL);
-	gtk_widget_show_all(window_telemetry);
-}
-
 void handle_telemetry_message(void *buf_ptr, int buf_len) {
 	int telemetry_id;
 	float battery_voltage;
-	kt_msg_read_int(&buf_ptr, &buf_len, &telemetry_id);
-	kt_msg_read_float(&buf_ptr, &buf_len, &battery_voltage);
+	while (kt_msg_read_int(&buf_ptr, &buf_len, &telemetry_id) != -1) {
+		//
+		kt_msg_read_float(&buf_ptr, &buf_len, &battery_voltage);
+		kt_log_debug("Id: %d, battery: %f", telemetry_id, battery_voltage);
+	}
 	/*char string[str_len + 1];
 	string[str_len] = 0;
 	kt_msg_read(&buf_ptr, &buf_len, string, str_len);*/
-	kt_log_debug("Id: %d, battery: %f", telemetry_id, battery_voltage);
 }
 
 gboolean on_new_message(GIOChannel *source, GIOCondition condition, gpointer data) {
@@ -166,20 +138,29 @@ gboolean on_new_message(GIOChannel *source, GIOCondition condition, gpointer dat
 	return TRUE;
 }
 
+void on_activate(GtkApplication* app, gpointer user_data) {
+	if (window_telemetry == NULL) {
+		int server_socket = kt_udp_bind(((char **)user_data)[1]);
+		if (server_socket == -1) {
+			kt_log_last("Failed to create server socket");
+			exit(-1);
+		}
+		client_socket = kt_udp_connect(((char **)user_data)[2], ((char **)user_data)[3]);
+		if (client_socket == -1) {
+			kt_log_last("Failed to create client socket");
+			exit(-1);
+		}
+		g_io_add_watch(g_io_channel_unix_new(server_socket), G_IO_IN, &on_new_message, NULL);
+		window_telemetry = create_window(app, NULL);
+		gtk_widget_show_all(GTK_WIDGET(window_telemetry));
+	} else {
+		gtk_window_present(window_telemetry);
+	}
+}
+
 int main (int argc, char **argv) {
-	int server_socket = kt_udp_bind(argv[1]);
-	if (server_socket == -1) {
-		kt_log_last("Failed to create server socket");
-		return -1;
-	}
-	client_socket = kt_udp_connect(argv[2], argv[3]);
-	if (client_socket == -1) {
-		kt_log_last("Failed to create client socket");
-		return -1;
-	}
-	g_io_add_watch(g_io_channel_unix_new(server_socket), G_IO_IN, &on_new_message, NULL);
 	GtkApplication *app = gtk_application_new("com.kikaitachi.mokytojas", G_APPLICATION_FLAGS_NONE);
-	g_signal_connect(app, "activate", G_CALLBACK(activate), NULL);
+	g_signal_connect(app, "activate", G_CALLBACK(on_activate), argv);
 	int status = g_application_run(G_APPLICATION (app), 1, argv);
 	g_object_unref(app);
 	return status;
