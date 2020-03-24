@@ -20,7 +20,7 @@ static socklen_t client_addr_len = sizeof(client_addr);
 static gboolean is_connected = FALSE;
 static gboolean is_packet_received = FALSE;
 
-GHashTable *key_down_to_action, *key_up_to_action;
+GHashTable *key_is_pressed, *key_down_to_action, *key_up_to_action;
 
 static GtkWidget *create_header_bar() {
 	header_bar = gtk_header_bar_new();
@@ -46,13 +46,18 @@ static GtkWidget *create_header_bar() {
 gboolean on_key_pressed(GtkWidget *widget, GdkEventKey *event, gpointer data) {
 	gpointer value = g_hash_table_lookup(key_down_to_action, (gconstpointer)&event->keyval);
 	if (value != NULL) {
-		int id = *((int *)value);
-		char buf[KT_MAX_MSG_SIZE];
-		int buf_len = KT_MAX_MSG_SIZE;
-		void *buf_ptr = &buf;
-		kt_msg_write_int(&buf_ptr, &buf_len, KT_MSG_TELEMETRY);
-		kt_msg_write_int(&buf_ptr, &buf_len, id);
-		kt_udp_send(client_socket, buf, KT_MAX_MSG_SIZE - buf_len);
+		if (!g_hash_table_contains(key_is_pressed, (gconstpointer)&event->keyval)) {
+			int id = *((int *)value);
+			char buf[KT_MAX_MSG_SIZE];
+			int buf_len = KT_MAX_MSG_SIZE;
+			void *buf_ptr = &buf;
+			kt_msg_write_int(&buf_ptr, &buf_len, KT_MSG_TELEMETRY);
+			kt_msg_write_int(&buf_ptr, &buf_len, id);
+			kt_udp_send(client_socket, buf, KT_MAX_MSG_SIZE - buf_len);
+			int *key = malloc(sizeof(int));
+			*key = event->keyval;
+			g_hash_table_add(key_is_pressed, key);
+		}
 		return TRUE;
 	}
 	return FALSE;
@@ -63,6 +68,7 @@ gboolean on_key_released(GtkWidget *widget, GdkEventKey *event, gpointer data) {
         printf("SPACE KEY PRESSED!");
         return TRUE;
     }*/
+	g_hash_table_remove(key_is_pressed, &event->keyval);
 	kt_log_info ("Key released: %d, %s", event->keyval, gdk_keyval_name(event->keyval));
     return FALSE;
 }
@@ -307,6 +313,7 @@ void on_activate(GtkApplication* app, gpointer user_data) {
 		broadcast_addr.sin_addr.s_addr = htonl(INADDR_BROADCAST);
 		broadcast_addr.sin_port = htons(atoi(((char **)user_data)[2]));
 
+		key_is_pressed = g_hash_table_new_full(g_int_hash, g_int_equal, free, NULL);
 		key_down_to_action = g_hash_table_new_full(g_int_hash, g_int_equal, free, free);
 		key_up_to_action = g_hash_table_new_full(g_int_hash, g_int_equal, free, free);
 
