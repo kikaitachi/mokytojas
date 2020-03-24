@@ -1,3 +1,4 @@
+#include <arpa/inet.h>
 #include <gtk/gtk.h>
 #include "kikaitachi.h"
 #include "resources.h"
@@ -11,7 +12,10 @@ static GtkWidget *header_bar;
 
 static int client_socket;
 static struct sockaddr_in broadcast_addr;
-static socklen_t broadcast_addr_len;
+static socklen_t broadcast_addr_len = sizeof(broadcast_addr);
+
+static struct sockaddr_in client_addr;
+static socklen_t client_addr_len = sizeof(client_addr);
 
 static gboolean is_connected = FALSE;
 static gboolean is_packet_received = FALSE;
@@ -202,26 +206,54 @@ void handle_telemetry_message(void *buf_ptr, int buf_len) {
 gboolean on_new_message(GIOChannel *source, GIOCondition condition, gpointer data) {
 	int fd = g_io_channel_unix_get_fd(source);
 	char buf[KT_MAX_MSG_SIZE];
-	ssize_t result = recv(fd, buf, sizeof(buf), 0);
-	is_packet_received = TRUE;
+	struct sockaddr_in addr;
+	socklen_t addr_len = sizeof(addr);
+	ssize_t result = recvfrom(fd, buf, sizeof(buf), 0, &addr, &addr_len);
+	/*struct ifaddrs *current_network_interface = nextwork_interfaces;
+	while (current_network_interface != NULL) {
+		printf("Network Interface Name :- %s\n",current_network_interface->ifa_name);
+		printf("Network Address of %s :- %d\n",current_network_interface->ifa_name,current_network_interface->ifa_addr);
+		printf("Network Data :- %d \n",current_network_interface->ifa_data);
+		printf("Socket Data : -%c\n",current_network_interface->ifa_addr->sa_data);
+		if (current_network_interface->ifa_addr->sa_family == AF_INET) {
+			kt_log_debug("AF_INET");
+			//if (((struct sockaddr_in *)current_network_interface->ifa_addr)->sin_addr.s_addr == addr.sin_addr.s_addr) {
+			//	kt_log_debug ("Ignore message from its own address %s", inet_ntoa(addr.sin_addr.s_addr));
+			//	return TRUE;
+			//}
+		}
+		current_network_interface = current_network_interface->ifa_next;
+	}*/
 	if (result == -1) {
 		kt_log_last("Failed to receive UDP packet");
 	} else {
-		kt_log_debug("Received packet of %zd bytes", result);
+		kt_log_debug("Received packet of %d bytes from addr len %d, family %d", result, addr_len, addr.sin_family);
 		void *buf_ptr = &buf;
 		int buf_len = result;
 		int msg_type;
 		kt_msg_read_int(&buf_ptr, &buf_len, &msg_type);
 		switch (msg_type) {
 			case KT_MSG_DISCOVER:
-				is_connected = TRUE;
-				gtk_header_bar_set_subtitle(GTK_HEADER_BAR(header_bar), "Connected");
+				if (result > 1) { // If not own broadcasted message
+					is_connected = TRUE;
+					memcpy(&client_addr, &addr, addr_len);
+					client_addr.sin_port = broadcast_addr.sin_port;
+					if (connect(client_socket, (const struct sockaddr *)&client_addr, client_addr_len) < 0) {
+						kt_log_last ("Failed to connect socket %d to %s", client_socket, inet_ntoa(client_addr.sin_addr));
+					}
+					char subtitle[256];
+					snprintf(subtitle, sizeof(subtitle), "Connected to %s", inet_ntoa(client_addr.sin_addr));
+					gtk_header_bar_set_subtitle(GTK_HEADER_BAR(header_bar), subtitle);
+					is_packet_received = TRUE;
+				}
 				break;
 			case KT_MSG_TELEMETRY:
 				handle_telemetry_message(buf_ptr, buf_len);
+				is_packet_received = TRUE;
 				break;
 			case KT_MSG_TELEMETRY_DEFINITION:
 				handle_telemetry_definition_message(buf_ptr, buf_len);
+				is_packet_received = TRUE;
 				break;
 			default:
 				kt_log_error("Received message of unknown type: %d", msg_type);
@@ -236,6 +268,8 @@ gint on_connection_timeout(gpointer data) {
 		is_packet_received = FALSE;
 	} else {
 		is_connected = FALSE;
+	}
+	if (!is_connected) {
 		gtk_header_bar_set_subtitle(GTK_HEADER_BAR(header_bar), "Disconnected");
 		uint8_t msg_type = KT_MSG_DISCOVER;
 		if (sendto(client_socket, &msg_type, 1, 0, (struct sockaddr *)&broadcast_addr, broadcast_addr_len) == -1) {
@@ -252,7 +286,7 @@ void on_activate(GtkApplication* app, gpointer user_data) {
 			kt_log_last("Failed to create server socket");
 			exit(-1);
 		}
-		client_socket = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP); //kt_udp_connect(((char **)user_data)[2], ((char **)user_data)[3]);
+		client_socket = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
 		if (client_socket == -1) {
 			kt_log_last("Failed to create client socket");
 			exit(-1);
@@ -267,11 +301,11 @@ void on_activate(GtkApplication* app, gpointer user_data) {
 		gtk_window_set_position(window_telemetry, GTK_WIN_POS_CENTER_ALWAYS);
 		gtk_widget_show_all(GTK_WIDGET(window_telemetry));
 
-		broadcast_addr_len = sizeof(broadcast_addr);
 		memset(&broadcast_addr, 0, broadcast_addr_len);
 		broadcast_addr.sin_family = AF_INET;
 		broadcast_addr.sin_addr.s_addr = htonl(INADDR_BROADCAST);
-		broadcast_addr.sin_port = htons(atoi(((char **)user_data)[3]));
+		broadcast_addr.sin_port = htons(atoi(((char **)user_data)[2]));
+
 		g_timeout_add(3000, on_connection_timeout, NULL);
 	} else {
 		gtk_window_present(window_telemetry);
