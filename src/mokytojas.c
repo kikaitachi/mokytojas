@@ -90,29 +90,11 @@ static GtkWindow *create_window(GtkApplication* app, GtkWidget *content) {
 	//g_signal_connect_swapped (button, "clicked", G_CALLBACK (gtk_widget_destroy), window);
 	gtk_container_add (GTK_CONTAINER (window), tree_view);
 
-	//GdkPixbuf * icon_title = gdk_pixbuf_new_from_inline(-1, icon, FALSE, NULL);
-	//gtk_window_set_icon(window, icon_title);
-	// TODO: implement proper solution
-	//gtk_window_set_icon_from_file(GTK_WINDOW (window), "resource:///com/kikaitachi/mokytojas/icon.svg", NULL);
-	//gtk_window_set_icon(GTK_WINDOW (window), gdk_pixbuf_new_from_resource("com/kikaitachi/mokytojas/icon.svg", NULL));
 	gtk_window_set_icon(window, gdk_pixbuf_new_from_stream(
 		g_resource_open_stream(mokytojas_get_resource(), "/com/kikaitachi/mokytojas/icon.svg", G_RESOURCE_LOOKUP_FLAGS_NONE, NULL), NULL, NULL));
 	// TODO: Free the returned object with g_object_unref()
 	gtk_window_set_default_size(GTK_WINDOW(window), 800, 600);
 
-	/*GtkTreeIter iter, parent;
-	gtk_tree_store_append(tree_store, &iter, NULL);
-	gtk_tree_store_set(tree_store, &iter, 0, "Temperature", -1);
-	gtk_tree_store_append(tree_store, &iter, NULL);
-	gtk_tree_store_set(tree_store, &iter, 0, "Voltage", -1);
-	gtk_tree_store_append(tree_store, &parent, NULL);
-	gtk_tree_store_set(tree_store, &parent, 0, "Dynamixel XM430-W350-T", -1);
-	gtk_tree_store_append(tree_store, &iter, &parent);
-	gtk_tree_store_set(tree_store, &iter, 0, "Temperature 1", -1);
-	gtk_tree_store_append(tree_store, &iter, &parent);
-	gtk_tree_store_set(tree_store, &iter, 0, "Voltage 1", -1);*/
-
-	//gtk_widget_add_events(GTK_WIDGET(window), GDK_KEY_RELEASE_MASK | GDK_KEY_PRESS_MASK);
 	g_signal_connect(G_OBJECT(window), "key-press-event", G_CALLBACK(on_key_pressed), NULL);
 	g_signal_connect(G_OBJECT(window), "key-release-event", G_CALLBACK(on_key_released), NULL);
 
@@ -143,9 +125,15 @@ void handle_telemetry_definition_message(void *buf_ptr, int buf_len) {
 		if (!find_tree_item_by_id(GTK_TREE_MODEL(telemetry_tree), &iter, id)) {
 			if (find_tree_item_by_id(GTK_TREE_MODEL(telemetry_tree), &parent, parent_id)) {
 				gtk_tree_store_append(telemetry_tree, &iter, &parent);
-				gtk_tree_store_set(telemetry_tree, &iter, 0, id, 1, name, 2, type, -1);
 			} else {
 				gtk_tree_store_append(telemetry_tree, &iter, NULL);
+			}
+			int key_down, key_up;
+			if (type == KT_TELEMETRY_TYPE_ACTION) {
+				kt_msg_read_int(&buf_ptr, &buf_len, &key_down);
+				kt_msg_read_int(&buf_ptr, &buf_len, &key_up);
+				gtk_tree_store_set(telemetry_tree, &iter, 0, id, 1, name, 2, type, 4, key_down, 5, key_up, -1);
+			} else {
 				gtk_tree_store_set(telemetry_tree, &iter, 0, id, 1, name, 2, type, -1);
 			}
 			gtk_tree_view_expand_all(GTK_TREE_VIEW(tree_view));
@@ -198,9 +186,6 @@ void handle_telemetry_message(void *buf_ptr, int buf_len) {
 			return;
 		}
 	}
-	/*char string[str_len + 1];
-	string[str_len] = 0;
-	kt_msg_read(&buf_ptr, &buf_len, string, str_len);*/
 }
 
 gboolean on_new_message(GIOChannel *source, GIOCondition condition, gpointer data) {
