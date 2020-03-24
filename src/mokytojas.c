@@ -67,6 +67,7 @@ static GtkWindow *create_window(GtkApplication* app, GtkWidget *content) {
 	telemetry_tree = gtk_tree_store_new(6, G_TYPE_INT, G_TYPE_STRING, G_TYPE_INT, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_STRING);
 
 	tree_view = gtk_tree_view_new_with_model(GTK_TREE_MODEL(telemetry_tree));
+	gtk_tree_view_set_grid_lines(tree_view, GTK_TREE_VIEW_GRID_LINES_BOTH);
 
 	GtkCellRenderer *renderer = gtk_cell_renderer_text_new();
 
