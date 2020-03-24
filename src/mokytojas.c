@@ -64,7 +64,7 @@ static GtkWindow *create_window(GtkApplication* app, GtkWidget *content) {
 	gtk_window_set_titlebar(window, create_header_bar());
 
 	// id, name, type, value, key to press, key to release
-	telemetry_tree = gtk_tree_store_new(6, G_TYPE_INT, G_TYPE_STRING, G_TYPE_INT, G_TYPE_STRING, G_TYPE_INT, G_TYPE_INT);
+	telemetry_tree = gtk_tree_store_new(6, G_TYPE_INT, G_TYPE_STRING, G_TYPE_INT, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_STRING);
 
 	tree_view = gtk_tree_view_new_with_model(GTK_TREE_MODEL(telemetry_tree));
 
@@ -132,7 +132,7 @@ void handle_telemetry_definition_message(void *buf_ptr, int buf_len) {
 			if (type == KT_TELEMETRY_TYPE_ACTION) {
 				kt_msg_read_int(&buf_ptr, &buf_len, &key_down);
 				kt_msg_read_int(&buf_ptr, &buf_len, &key_up);
-				gtk_tree_store_set(telemetry_tree, &iter, 0, id, 1, name, 2, type, 4, key_down, 5, key_up, -1);
+				gtk_tree_store_set(telemetry_tree, &iter, 0, id, 1, name, 2, type, 4, gdk_keyval_name(key_down), 5, gdk_keyval_name(key_up), -1);
 			} else {
 				gtk_tree_store_set(telemetry_tree, &iter, 0, id, 1, name, 2, type, -1);
 			}
