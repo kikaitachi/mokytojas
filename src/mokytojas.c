@@ -7,11 +7,17 @@ static GtkWindow *window_telemetry;
 
 static GtkTreeStore *telemetry_tree;
 static GtkWidget *tree_view;
+static GtkWidget *header_bar;
 
 static int client_socket;
+static struct sockaddr_in broadcast_addr;
+static socklen_t broadcast_addr_len;
+
+static gboolean is_connected = FALSE;
+static gboolean is_packet_received = FALSE;
 
 static GtkWidget *create_header_bar() {
-	GtkWidget *header_bar = gtk_header_bar_new();
+	header_bar = gtk_header_bar_new();
 
 	/*GMenu *menu_model = g_menu_new();
 	g_menu_append(menu_model, "Telemetry", NULL);
@@ -25,7 +31,6 @@ static GtkWidget *create_header_bar() {
 	gtk_menu_button_set_popup(GTK_MENU_BUTTON (menu_button), menu);*/
 
 	gtk_header_bar_set_title(GTK_HEADER_BAR(header_bar), "Telemetry");
-	gtk_header_bar_set_subtitle(GTK_HEADER_BAR(header_bar), "Disconnected");
 	gtk_header_bar_set_show_close_button(GTK_HEADER_BAR(header_bar), TRUE);
 	//gtk_header_bar_pack_start(GTK_HEADER_BAR(header_bar), menu_button);
 
@@ -198,6 +203,7 @@ gboolean on_new_message(GIOChannel *source, GIOCondition condition, gpointer dat
 	int fd = g_io_channel_unix_get_fd(source);
 	char buf[KT_MAX_MSG_SIZE];
 	ssize_t result = recv(fd, buf, sizeof(buf), 0);
+	is_packet_received = TRUE;
 	if (result == -1) {
 		kt_log_last("Failed to receive UDP packet");
 	} else {
@@ -207,6 +213,10 @@ gboolean on_new_message(GIOChannel *source, GIOCondition condition, gpointer dat
 		int msg_type;
 		kt_msg_read_int(&buf_ptr, &buf_len, &msg_type);
 		switch (msg_type) {
+			case KT_MSG_DISCOVER:
+				is_connected = TRUE;
+				gtk_header_bar_set_subtitle(GTK_HEADER_BAR(header_bar), "Connected");
+				break;
 			case KT_MSG_TELEMETRY:
 				handle_telemetry_message(buf_ptr, buf_len);
 				break;
@@ -214,8 +224,22 @@ gboolean on_new_message(GIOChannel *source, GIOCondition condition, gpointer dat
 				handle_telemetry_definition_message(buf_ptr, buf_len);
 				break;
 			default:
-				kt_log_error ("Received message of unknown type: %d", msg_type);
+				kt_log_error("Received message of unknown type: %d", msg_type);
 				break;
+		}
+	}
+	return TRUE;
+}
+
+gint on_connection_timeout(gpointer data) {
+	if (is_packet_received) {
+		is_packet_received = FALSE;
+	} else {
+		is_connected = FALSE;
+		gtk_header_bar_set_subtitle(GTK_HEADER_BAR(header_bar), "Disconnected");
+		uint8_t msg_type = KT_MSG_DISCOVER;
+		if (sendto(client_socket, &msg_type, 1, 0, (struct sockaddr *)&broadcast_addr, broadcast_addr_len) == -1) {
+			kt_log_last("Failed to send DISCOVER message");
 		}
 	}
 	return TRUE;
@@ -228,15 +252,27 @@ void on_activate(GtkApplication* app, gpointer user_data) {
 			kt_log_last("Failed to create server socket");
 			exit(-1);
 		}
-		client_socket = kt_udp_connect(((char **)user_data)[2], ((char **)user_data)[3]);
+		client_socket = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP); //kt_udp_connect(((char **)user_data)[2], ((char **)user_data)[3]);
 		if (client_socket == -1) {
 			kt_log_last("Failed to create client socket");
 			exit(-1);
 		}
+		int broadcastEnable = 1;
+		if (setsockopt(client_socket, SOL_SOCKET, SO_BROADCAST, (void *)&broadcastEnable, sizeof(broadcastEnable)) < 0) {
+			kt_log_last("Failed to enable broadcast for socket");
+		}
+
 		g_io_add_watch(g_io_channel_unix_new(server_socket), G_IO_IN, &on_new_message, NULL);
 		window_telemetry = create_window(app, NULL);
 		gtk_window_set_position(window_telemetry, GTK_WIN_POS_CENTER_ALWAYS);
 		gtk_widget_show_all(GTK_WIDGET(window_telemetry));
+
+		broadcast_addr_len = sizeof(broadcast_addr);
+		memset(&broadcast_addr, 0, broadcast_addr_len);
+		broadcast_addr.sin_family = AF_INET;
+		broadcast_addr.sin_addr.s_addr = htonl(INADDR_BROADCAST);
+		broadcast_addr.sin_port = htons(atoi(((char **)user_data)[3]));
+		g_timeout_add(3000, on_connection_timeout, NULL);
 	} else {
 		gtk_window_present(window_telemetry);
 	}
