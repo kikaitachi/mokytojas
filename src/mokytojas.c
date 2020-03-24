@@ -20,6 +20,8 @@ static socklen_t client_addr_len = sizeof(client_addr);
 static gboolean is_connected = FALSE;
 static gboolean is_packet_received = FALSE;
 
+GHashTable *key_down_to_action, *key_up_to_action;
+
 static GtkWidget *create_header_bar() {
 	header_bar = gtk_header_bar_new();
 
@@ -42,12 +44,18 @@ static GtkWidget *create_header_bar() {
 }
 
 gboolean on_key_pressed(GtkWidget *widget, GdkEventKey *event, gpointer data) {
-    if (event->keyval == GDK_KEY_a || event->keyval == GDK_KEY_d) {
-        kt_log_info ("Key pressed: %d", event->keyval);
-        return TRUE;
-    }
-	kt_log_info ("Key pressed but not handled: %d, %s", event->keyval, gdk_keyval_name(event->keyval));
-    return FALSE;
+	gpointer value = g_hash_table_lookup(key_down_to_action, (gconstpointer)&event->keyval);
+	if (value != NULL) {
+		int id = *((int *)value);
+		char buf[KT_MAX_MSG_SIZE];
+		int buf_len = KT_MAX_MSG_SIZE;
+		void *buf_ptr = &buf;
+		kt_msg_write_int(&buf_ptr, &buf_len, KT_MSG_TELEMETRY);
+		kt_msg_write_int(&buf_ptr, &buf_len, id);
+		kt_udp_send(client_socket, buf, KT_MAX_MSG_SIZE - buf_len);
+		return TRUE;
+	}
+	return FALSE;
 }
 
 gboolean on_key_released(GtkWidget *widget, GdkEventKey *event, gpointer data) {
@@ -132,6 +140,13 @@ void handle_telemetry_definition_message(void *buf_ptr, int buf_len) {
 			int key_down, key_up;
 			if (type == KT_TELEMETRY_TYPE_ACTION) {
 				kt_msg_read_int(&buf_ptr, &buf_len, &key_down);
+				if (key_down != 0) {
+					int *key = malloc(sizeof(int));
+					int *value = malloc(sizeof(int));
+					*key = key_down;
+					*value = id;
+					g_hash_table_insert(key_down_to_action, key, value);
+				}
 				kt_msg_read_int(&buf_ptr, &buf_len, &key_up);
 				gtk_tree_store_set(telemetry_tree, &iter, 0, id, 1, name, 2, type, 4, gdk_keyval_name(key_down), 5, gdk_keyval_name(key_up), -1);
 			} else {
@@ -291,6 +306,9 @@ void on_activate(GtkApplication* app, gpointer user_data) {
 		broadcast_addr.sin_family = AF_INET;
 		broadcast_addr.sin_addr.s_addr = htonl(INADDR_BROADCAST);
 		broadcast_addr.sin_port = htons(atoi(((char **)user_data)[2]));
+
+		key_down_to_action = g_hash_table_new_full(g_int_hash, g_int_equal, free, free);
+		key_up_to_action = g_hash_table_new_full(g_int_hash, g_int_equal, free, free);
 
 		g_timeout_add(3000, on_connection_timeout, NULL);
 	} else {
