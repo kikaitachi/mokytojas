@@ -126,7 +126,6 @@ void handle_telemetry_definition_message(void *buf_ptr, int buf_len) {
 		int name_len;
 		kt_msg_read_int(&buf_ptr, &buf_len, &name_len);
 
-		//char name[name_len + 1];
 		char *name = malloc(name_len + 1);
 		kt_msg_read(&buf_ptr, &buf_len, name, name_len);
 		name[name_len] = 0;
@@ -166,6 +165,8 @@ void handle_telemetry_definition_message(void *buf_ptr, int buf_len) {
 
 void handle_telemetry_message(void *buf_ptr, int buf_len) {
 	int id;
+	int len;
+	char *result;
 	float value_float;
 	int value_int;
 	char value_string[KT_MAX_MSG_SIZE];
@@ -177,14 +178,17 @@ void handle_telemetry_message(void *buf_ptr, int buf_len) {
 			int type = g_value_get_int(&value);
 			g_value_unset(&value);
 			switch (type) {
+				case KT_TELEMETRY_TYPE_INT:
+					kt_msg_read_int(&buf_ptr, &buf_len, &value_int);
+					len = snprintf(NULL, 0, "%d", value_int);
+					result = (char *)malloc(len + 1);
+					snprintf(result, len + 1, "%d", value_int);
+					gtk_tree_store_set(telemetry_tree, &iter, 3, result, -1);
+					break;
 				case KT_TELEMETRY_TYPE_FLOAT:
 					kt_msg_read_float(&buf_ptr, &buf_len, &value_float);
-					/*GValue value = { 0, };
-					gtk_tree_model_get_value(GTK_TREE_MODEL(telemetry_tree), &iter, 3, &value);
-					g_value_set_string(&value, "test");
-					g_value_unset(&value);*/
-					int len = snprintf(NULL, 0, "%f", value_float);
-					char *result = (char *)malloc(len + 1);
+					len = snprintf(NULL, 0, "%f", value_float);
+					result = (char *)malloc(len + 1);
 					snprintf(result, len + 1, "%f", value_float);
 					gtk_tree_store_set(telemetry_tree, &iter, 3, result, -1);
 					break;
