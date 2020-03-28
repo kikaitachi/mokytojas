@@ -322,7 +322,8 @@ void on_activate(GtkApplication* app, gpointer user_data) {
 		key_down_to_action = g_hash_table_new_full(g_int_hash, g_int_equal, free, free);
 		key_up_to_action = g_hash_table_new_full(g_int_hash, g_int_equal, free, free);
 
-		g_timeout_add(3000, on_connection_timeout, NULL);
+		on_connection_timeout(NULL);
+		g_timeout_add(2000, on_connection_timeout, NULL);
 	} else {
 		gtk_window_present(window_telemetry);
 	}
