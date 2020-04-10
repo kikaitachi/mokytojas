@@ -36,7 +36,7 @@ static GtkWidget *create_header_bar() {
 	GtkWidget *menu_button = gtk_menu_button_new();
 	gtk_menu_button_set_popup(GTK_MENU_BUTTON (menu_button), menu);*/
 
-	gtk_header_bar_set_title(GTK_HEADER_BAR(header_bar), "Telemetry");
+	gtk_header_bar_set_title(GTK_HEADER_BAR(header_bar), "Mokytojas");
 	gtk_header_bar_set_show_close_button(GTK_HEADER_BAR(header_bar), TRUE);
 	//gtk_header_bar_pack_start(GTK_HEADER_BAR(header_bar), menu_button);
 
@@ -73,15 +73,31 @@ gboolean on_key_released(GtkWidget *widget, GdkEventKey *event, gpointer data) {
     return FALSE;
 }
 
+gboolean on_draw_map(GtkWidget *widget, cairo_t *cr, gpointer data) {
+	GtkStyleContext *context = gtk_widget_get_style_context(widget);
+	guint width = gtk_widget_get_allocated_width(widget);
+	guint height = gtk_widget_get_allocated_height(widget);
+	gtk_render_background(context, cr, 0, 0, width, height);
+	// TODO: replace example with real map drawing
+	GdkRGBA color;
+	cairo_arc(cr, width / 2.0, height / 2.0, MIN(width, height) / 2.0, 0, 2 * G_PI);
+	gtk_style_context_get_color(context, gtk_style_context_get_state (context), &color);
+	gdk_cairo_set_source_rgba(cr, &color);
+	cairo_fill(cr);
+	return FALSE;
+}
+
 static GtkWindow *create_window(GtkApplication* app, GtkWidget *content) {
 	GtkWindow *window = GTK_WINDOW(gtk_application_window_new(app));
 	gtk_window_set_titlebar(window, create_header_bar());
+
+	GtkWidget *tabs = gtk_notebook_new();
 
 	// id, name, type, value, key to press, key to release
 	telemetry_tree = gtk_tree_store_new(6, G_TYPE_INT, G_TYPE_STRING, G_TYPE_INT, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_STRING);
 
 	tree_view = gtk_tree_view_new_with_model(GTK_TREE_MODEL(telemetry_tree));
-	gtk_tree_view_set_grid_lines(tree_view, GTK_TREE_VIEW_GRID_LINES_BOTH);
+	gtk_tree_view_set_grid_lines(GTK_TREE_VIEW(tree_view), GTK_TREE_VIEW_GRID_LINES_BOTH);
 
 	GtkCellRenderer *renderer = gtk_cell_renderer_text_new();
 
@@ -104,7 +120,13 @@ static GtkWindow *create_window(GtkApplication* app, GtkWidget *content) {
 
 	GtkWidget *scrolled_window = gtk_scrolled_window_new(NULL, NULL);
 	gtk_container_add(GTK_CONTAINER(scrolled_window), tree_view);
-	gtk_container_add(GTK_CONTAINER(window), scrolled_window);
+
+	GtkWidget *map = gtk_drawing_area_new();
+	g_signal_connect(G_OBJECT(map), "draw", G_CALLBACK(on_draw_map), NULL);
+
+	gtk_notebook_append_page(GTK_NOTEBOOK(tabs), scrolled_window, gtk_label_new("Telemetry"));
+	gtk_notebook_append_page(GTK_NOTEBOOK(tabs), map, gtk_label_new("Map"));
+	gtk_container_add(GTK_CONTAINER(window), tabs);
 
 	gtk_window_set_icon(window, gdk_pixbuf_new_from_stream(
 		g_resource_open_stream(mokytojas_get_resource(), "/com/kikaitachi/mokytojas/icon.svg", G_RESOURCE_LOOKUP_FLAGS_NONE, NULL), NULL, NULL));
