@@ -344,11 +344,11 @@ gint on_connection_timeout(gpointer data) {
 
 void on_activate(GtkApplication* app, gpointer user_data) {
 	if (window_telemetry == NULL) {
-		kt_map_init(0, 0, 1, 1, 0.25);
+		kt_map_init(0, 0, 1, 1, 0.01);
 		//kt_map_add_circle(0.5, 0.5, 0.249, MAP_NODE_FLAT, 1);
-		kt_map_add_circle(0.5, 0.5, 0.5, MAP_NODE_FLAT, 1);
-		//kt_map_add_circle(0.5 - 0.15 / 2, 0.5, 0.095, MAP_NODE_FLAT, 1);
-		//kt_map_add_circle(0.5 + 0.15 / 2, 0.5, 0.01, MAP_NODE_FLAT, 1);
+		//kt_map_add_circle(0.5, 0.5, 0.5, MAP_NODE_FLAT, 1);
+		kt_map_add_circle(0.5 - 0.15 / 2, 0.5, 0.095 / 2, MAP_NODE_FLAT, 1);
+		kt_map_add_circle(0.5 + 0.15 / 2, 0.5, 0.1 / 2, MAP_NODE_FLAT, 1);
 
 		int server_socket = kt_udp_bind(((char **)user_data)[1]);
 		if (server_socket == -1) {
