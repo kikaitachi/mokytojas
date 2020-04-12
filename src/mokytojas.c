@@ -73,18 +73,38 @@ gboolean on_key_released(GtkWidget *widget, GdkEventKey *event, gpointer data) {
     return FALSE;
 }
 
+void on_map_node(float x, float y, float width, float height, enum MAP_NODE_TYPE type, float likelihood, void *data) {
+	float scale = 600;
+	cairo_t *cr = data;
+	GdkRGBA color;
+	color.red = 0;
+	color.green = type == MAP_NODE_FLAT ? likelihood : 0;
+	color.blue = 0;
+	color.alpha = 1;
+	cairo_rectangle(cr, x * scale, y * scale, width * scale, height * scale);
+	gdk_cairo_set_source_rgba(cr, &color);
+	cairo_fill(cr);
+}
+
 gboolean on_draw_map(GtkWidget *widget, cairo_t *cr, gpointer data) {
 	GtkStyleContext *context = gtk_widget_get_style_context(widget);
 	guint width = gtk_widget_get_allocated_width(widget);
 	guint height = gtk_widget_get_allocated_height(widget);
 	gtk_render_background(context, cr, 0, 0, width, height);
-	// TODO: replace example with real map drawing
+	/*
 	GdkRGBA color;
+	color.red = 1;
+	color.green = 0;
+	color.blue = 0;
+	color.alpha = 0.5;
 	cairo_rectangle (cr, 0, 0, MIN(width, height), MIN(width, height));
 	//cairo_arc(cr, width / 2.0, height / 2.0, MIN(width, height) / 2.0, 0, 2 * G_PI);
-	gtk_style_context_get_color(context, gtk_style_context_get_state (context), &color);
+	//gtk_style_context_get_color(context, gtk_style_context_get_state (context), &color);
 	gdk_cairo_set_source_rgba(cr, &color);
-	cairo_fill(cr);
+	cairo_fill(cr);*/
+
+	kt_map_traverse(on_map_node, cr);
+
 	return FALSE;
 }
 
@@ -316,6 +336,11 @@ gint on_connection_timeout(gpointer data) {
 
 void on_activate(GtkApplication* app, gpointer user_data) {
 	if (window_telemetry == NULL) {
+		kt_map_init(0, 0, 1, 1, 0.01);
+		kt_map_add_circle(0.5, 0.5, 0.249, MAP_NODE_FLAT, 1);
+		//kt_map_add_circle(0.5 - 0.15 / 2, 0.5, 0.095, MAP_NODE_FLAT, 1);
+		//kt_map_add_circle(0.5 + 0.15 / 2, 0.5, 0.01, MAP_NODE_FLAT, 1);
+
 		int server_socket = kt_udp_bind(((char **)user_data)[1]);
 		if (server_socket == -1) {
 			kt_log_last("Failed to create server socket");
