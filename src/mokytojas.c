@@ -25,20 +25,8 @@ GHashTable *key_is_pressed, *key_down_to_action, *key_up_to_action;
 static GtkWidget *create_header_bar() {
 	header_bar = gtk_header_bar_new();
 
-	/*GMenu *menu_model = g_menu_new();
-	g_menu_append(menu_model, "Telemetry", NULL);
-	g_menu_append(menu_model, "Control", NULL);
-	g_menu_append(menu_model, "SLAM", NULL);
-	g_menu_append(menu_model, "Video", NULL);
-
-	GtkWidget *menu = gtk_menu_new_from_model((GMenuModel *)menu_model);
-
-	GtkWidget *menu_button = gtk_menu_button_new();
-	gtk_menu_button_set_popup(GTK_MENU_BUTTON (menu_button), menu);*/
-
 	gtk_header_bar_set_title(GTK_HEADER_BAR(header_bar), "Mokytojas");
 	gtk_header_bar_set_show_close_button(GTK_HEADER_BAR(header_bar), TRUE);
-	//gtk_header_bar_pack_start(GTK_HEADER_BAR(header_bar), menu_button);
 
 	return header_bar;
 }
@@ -122,8 +110,8 @@ static GtkWindow *create_window(GtkApplication* app, GtkWidget *content) {
 
 	GtkWidget *tabs = gtk_notebook_new();
 
-	// id, name, type, value, key to press, key to release
-	telemetry_tree = gtk_tree_store_new(6, G_TYPE_INT, G_TYPE_STRING, G_TYPE_INT, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_STRING);
+	// id, name, type, value, modifiers, key to press, key to release
+	telemetry_tree = gtk_tree_store_new(7, G_TYPE_INT, G_TYPE_STRING, G_TYPE_INT, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_STRING);
 
 	tree_view = gtk_tree_view_new_with_model(GTK_TREE_MODEL(telemetry_tree));
 	gtk_tree_view_set_grid_lines(GTK_TREE_VIEW(tree_view), GTK_TREE_VIEW_GRID_LINES_BOTH);
@@ -136,14 +124,18 @@ static GtkWindow *create_window(GtkApplication* app, GtkWidget *content) {
 	GtkTreeViewColumn *column_value = gtk_tree_view_column_new_with_attributes(
 		"Value or state", renderer, "text", 3, NULL);
 
+	GtkTreeViewColumn *column_key_mod = gtk_tree_view_column_new_with_attributes(
+		"Modifiers", renderer, "text", 4, NULL);
+
 	GtkTreeViewColumn *column_key_press = gtk_tree_view_column_new_with_attributes(
-		"On key press", renderer, "text", 4, NULL);
+		"Key down", renderer, "text", 5, NULL);
 
 	GtkTreeViewColumn *column_key_release = gtk_tree_view_column_new_with_attributes(
-		"On key release", renderer, "text", 5, NULL);
+		"Key up", renderer, "text", 6, NULL);
 
 	gtk_tree_view_append_column(GTK_TREE_VIEW(tree_view), column_sensor_or_actuator);
 	gtk_tree_view_append_column(GTK_TREE_VIEW(tree_view), column_value);
+	gtk_tree_view_append_column(GTK_TREE_VIEW(tree_view), column_key_mod);
 	gtk_tree_view_append_column(GTK_TREE_VIEW(tree_view), column_key_press);
 	gtk_tree_view_append_column(GTK_TREE_VIEW(tree_view), column_key_release);
 
@@ -194,7 +186,7 @@ void handle_telemetry_definition_message(void *buf_ptr, int buf_len) {
 			} else {
 				gtk_tree_store_append(telemetry_tree, &iter, NULL);
 			}
-			int key_down, key_up;
+			int modifiers, key_down, key_up;
 			if (type == KT_TELEMETRY_TYPE_ACTION) {
 				kt_msg_read_int(&buf_ptr, &buf_len, &key_down);
 				if (key_down != 0) {
@@ -204,8 +196,16 @@ void handle_telemetry_definition_message(void *buf_ptr, int buf_len) {
 					*value = id;
 					g_hash_table_insert(key_down_to_action, key, value);
 				}
+				kt_msg_read_int(&buf_ptr, &buf_len, &modifiers);
 				kt_msg_read_int(&buf_ptr, &buf_len, &key_up);
-				gtk_tree_store_set(telemetry_tree, &iter, 0, id, 1, name, 2, type, 4, gdk_keyval_name(key_down), 5, gdk_keyval_name(key_up), -1);
+				gtk_tree_store_set(telemetry_tree, &iter,
+					0, id,
+					1, name,
+					2, type,
+					4, modifiers & GDK_CONTROL_MASK ? "Ctrl" : modifiers & GDK_MOD1_MASK ? "Alt" : "",
+					5, gdk_keyval_name(key_down),
+					6, gdk_keyval_name(key_up),
+					-1);
 			} else {
 				gtk_tree_store_set(telemetry_tree, &iter, 0, id, 1, name, 2, type, -1);
 			}
