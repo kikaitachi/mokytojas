@@ -2,6 +2,7 @@
 #include <gtk/gtk.h>
 #include "kikaitachi.h"
 #include "resources.h"
+#include "shortcuts.h"
 #include "telemetry.h"
 
 static GtkWindow *window_telemetry;
@@ -20,7 +21,7 @@ static socklen_t client_addr_len = sizeof(client_addr);
 static gboolean is_connected = FALSE;
 static gboolean is_packet_received = FALSE;
 
-GHashTable *key_is_pressed, *key_down_to_action, *key_up_to_action;
+GHashTable *key_is_pressed;
 
 static GtkWidget *create_header_bar() {
 	header_bar = gtk_header_bar_new();
@@ -31,20 +32,24 @@ static GtkWidget *create_header_bar() {
 	return header_bar;
 }
 
+static void send_key_telemetry_msg(int id) {
+	char buf[KT_MAX_MSG_SIZE];
+	int buf_len = KT_MAX_MSG_SIZE;
+	void *buf_ptr = &buf;
+	kt_msg_write_int(&buf_ptr, &buf_len, KT_MSG_TELEMETRY);
+	kt_msg_write_int(&buf_ptr, &buf_len, id);
+	kt_udp_send(client_socket, buf, KT_MAX_MSG_SIZE - buf_len);
+}
+
 gboolean on_key_pressed(GtkWidget *widget, GdkEventKey *event, gpointer data) {
-	gpointer value = g_hash_table_lookup(key_down_to_action, (gconstpointer)&event->keyval);
-	if (value != NULL) {
+	int id = find_shortcut(event->state, event->keyval, 0);
+	if (id != -1) {
 		if (!g_hash_table_contains(key_is_pressed, (gconstpointer)&event->keyval)) {
-			int id = *((int *)value);
-			char buf[KT_MAX_MSG_SIZE];
-			int buf_len = KT_MAX_MSG_SIZE;
-			void *buf_ptr = &buf;
-			kt_msg_write_int(&buf_ptr, &buf_len, KT_MSG_TELEMETRY);
-			kt_msg_write_int(&buf_ptr, &buf_len, id);
-			kt_udp_send(client_socket, buf, KT_MAX_MSG_SIZE - buf_len);
 			int *key = malloc(sizeof(int));
 			*key = event->keyval;
 			g_hash_table_add(key_is_pressed, key);
+
+			send_key_telemetry_msg(id);
 		}
 		return TRUE;
 	}
@@ -52,12 +57,11 @@ gboolean on_key_pressed(GtkWidget *widget, GdkEventKey *event, gpointer data) {
 }
 
 gboolean on_key_released(GtkWidget *widget, GdkEventKey *event, gpointer data) {
-    /*if (event->keyval == GDK_KEY_space) {
-        printf("SPACE KEY PRESSED!");
-        return TRUE;
-    }*/
-	g_hash_table_remove(key_is_pressed, &event->keyval);
-	kt_log_info ("Key released: %d, %s", event->keyval, gdk_keyval_name(event->keyval));
+    g_hash_table_remove(key_is_pressed, &event->keyval);
+	int id = find_shortcut(event->state, 0, event->keyval);
+	if (id != -1) {
+		send_key_telemetry_msg(id);
+	}
     return FALSE;
 }
 
@@ -188,15 +192,8 @@ void handle_telemetry_definition_message(void *buf_ptr, int buf_len) {
 			}
 			int modifiers, key_down, key_up;
 			if (type == KT_TELEMETRY_TYPE_ACTION) {
-				kt_msg_read_int(&buf_ptr, &buf_len, &key_down);
-				if (key_down != 0) {
-					int *key = malloc(sizeof(int));
-					int *value = malloc(sizeof(int));
-					*key = key_down;
-					*value = id;
-					g_hash_table_insert(key_down_to_action, key, value);
-				}
 				kt_msg_read_int(&buf_ptr, &buf_len, &modifiers);
+				kt_msg_read_int(&buf_ptr, &buf_len, &key_down);
 				kt_msg_read_int(&buf_ptr, &buf_len, &key_up);
 				gtk_tree_store_set(telemetry_tree, &iter,
 					0, id,
@@ -206,6 +203,7 @@ void handle_telemetry_definition_message(void *buf_ptr, int buf_len) {
 					5, gdk_keyval_name(key_down),
 					6, gdk_keyval_name(key_up),
 					-1);
+				add_shortcut(modifiers, key_down, key_up, id);
 			} else {
 				gtk_tree_store_set(telemetry_tree, &iter, 0, id, 1, name, 2, type, -1);
 			}
@@ -271,7 +269,7 @@ gboolean on_new_message(GIOChannel *source, GIOCondition condition, gpointer dat
 	char buf[KT_MAX_MSG_SIZE];
 	struct sockaddr_in addr;
 	socklen_t addr_len = sizeof(addr);
-	ssize_t result = recvfrom(fd, buf, sizeof(buf), 0, &addr, &addr_len);
+	ssize_t result = recvfrom(fd, buf, sizeof(buf), 0, (struct sockaddr * restrict)&addr, &addr_len);
 	/*struct ifaddrs *current_network_interface = nextwork_interfaces;
 	while (current_network_interface != NULL) {
 		printf("Network Interface Name :- %s\n",current_network_interface->ifa_name);
@@ -376,8 +374,6 @@ void on_activate(GtkApplication* app, gpointer user_data) {
 		broadcast_addr.sin_port = htons(atoi(((char **)user_data)[2]));
 
 		key_is_pressed = g_hash_table_new_full(g_int_hash, g_int_equal, free, NULL);
-		key_down_to_action = g_hash_table_new_full(g_int_hash, g_int_equal, free, free);
-		key_up_to_action = g_hash_table_new_full(g_int_hash, g_int_equal, free, free);
 
 		on_connection_timeout(NULL);
 		g_timeout_add(2000, on_connection_timeout, NULL);
