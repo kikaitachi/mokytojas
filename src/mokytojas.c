@@ -234,6 +234,7 @@ void handle_telemetry_message(void *buf_ptr, int buf_len) {
 					result = (char *)malloc(len + 1);
 					snprintf(result, len + 1, "%d", value_int);
 					gtk_tree_store_set(telemetry_tree, &iter, 3, result, -1);
+					free(result);
 					break;
 				case KT_TELEMETRY_TYPE_FLOAT:
 					kt_msg_read_float(&buf_ptr, &buf_len, &value_float);
@@ -241,6 +242,7 @@ void handle_telemetry_message(void *buf_ptr, int buf_len) {
 					result = (char *)malloc(len + 1);
 					snprintf(result, len + 1, "%f", value_float);
 					gtk_tree_store_set(telemetry_tree, &iter, 3, result, -1);
+					free(result);
 					break;
 				case KT_TELEMETRY_TYPE_STRING:
 					kt_msg_read_int(&buf_ptr, &buf_len, &value_int);
