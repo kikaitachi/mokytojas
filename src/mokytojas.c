@@ -199,7 +199,7 @@ void handle_telemetry_definition_message(void *buf_ptr, int buf_len) {
 					0, id,
 					1, name,
 					2, type,
-					4, modifiers & GDK_CONTROL_MASK ? "Ctrl" : modifiers & GDK_MOD1_MASK ? "Alt" : "",
+					4, modifiers & GDK_CONTROL_MASK ? "Ctrl" : modifiers & GDK_MOD1_MASK ? "Alt" : modifiers & GDK_SHIFT_MASK ? "Shift" : "",
 					5, gdk_keyval_name(key_down),
 					6, gdk_keyval_name(key_up),
 					-1);
