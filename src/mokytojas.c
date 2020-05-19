@@ -39,10 +39,12 @@ static void send_key_telemetry_msg(int id) {
 	kt_msg_write_int(&buf_ptr, &buf_len, KT_MSG_TELEMETRY);
 	kt_msg_write_int(&buf_ptr, &buf_len, id);
 	kt_udp_send(client_socket, buf, KT_MAX_MSG_SIZE - buf_len);
+	kt_log_debug("Sent telemetry message with id %d", id);
 }
 
 gboolean on_key_pressed(GtkWidget *widget, GdkEventKey *event, gpointer data) {
-	int id = find_shortcut(event->state, event->keyval, 0);
+	int id = find_shortcut(event->state & ~GDK_MOD2_MASK, event->keyval, 0);
+	kt_log_debug("Found shortcut with id %d for state %d and key %d", id, event->state, event->keyval);
 	if (id != -1) {
 		if (!g_hash_table_contains(key_is_pressed, (gconstpointer)&event->keyval)) {
 			int *key = malloc(sizeof(int));
