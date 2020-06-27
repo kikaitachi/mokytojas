@@ -166,6 +166,31 @@ static GtkWindow *create_window(GtkApplication* app, GtkWidget *content) {
 	return window;
 }
 
+char *modifiers_to_string(int modifiers) {
+	if ((modifiers & GDK_CONTROL_MASK) && (modifiers & GDK_MOD1_MASK) && (modifiers & GDK_SHIFT_MASK)) {
+		return "Ctrl+Alt+Shift";
+	}
+	if ((modifiers & GDK_CONTROL_MASK) && (modifiers & GDK_MOD1_MASK)) {
+		return "Ctrl+Alt";
+	}
+	if ((modifiers & GDK_CONTROL_MASK) && (modifiers & GDK_SHIFT_MASK)) {
+		return "Ctrl+Shift";
+	}
+	if ((modifiers & GDK_MOD1_MASK) && (modifiers & GDK_SHIFT_MASK)) {
+		return "Alt+Shift";
+	}
+	if (modifiers & GDK_CONTROL_MASK) {
+		return "Ctrl";
+	}
+	if (modifiers & GDK_MOD1_MASK) {
+		return "Alt";
+	}
+	if (modifiers & GDK_SHIFT_MASK) {
+		return "Shift";
+	}
+	return "";
+}
+
 void handle_telemetry_definition_message(void *buf_ptr, int buf_len) {
 	GtkTreeIter iter, parent;
 	int id;
@@ -201,7 +226,7 @@ void handle_telemetry_definition_message(void *buf_ptr, int buf_len) {
 					0, id,
 					1, name,
 					2, type,
-					4, modifiers & GDK_CONTROL_MASK ? "Ctrl" : modifiers & GDK_MOD1_MASK ? "Alt" : modifiers & GDK_SHIFT_MASK ? "Shift" : "",
+					4, modifiers_to_string(modifiers),
 					5, gdk_keyval_name(key_down),
 					6, gdk_keyval_name(key_up),
 					-1);
