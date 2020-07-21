@@ -44,7 +44,7 @@ static void send_key_telemetry_msg(int id) {
 
 gboolean on_key_pressed(GtkWidget *widget, GdkEventKey *event, gpointer data) {
 	int id = find_shortcut(event->state & ~GDK_MOD2_MASK, event->keyval, 0);
-	kt_log_debug("Found shortcut with id %d for state %d and key %d", id, event->state, event->keyval);
+	kt_log_debug("Found shortcut down with id %d for state %d and key %d", id, event->state, event->keyval);
 	if (id != -1) {
 		if (!g_hash_table_contains(key_is_pressed, (gconstpointer)&event->keyval)) {
 			int *key = malloc(sizeof(int));
@@ -60,7 +60,8 @@ gboolean on_key_pressed(GtkWidget *widget, GdkEventKey *event, gpointer data) {
 
 gboolean on_key_released(GtkWidget *widget, GdkEventKey *event, gpointer data) {
     g_hash_table_remove(key_is_pressed, &event->keyval);
-	int id = find_shortcut(event->state, 0, event->keyval);
+	int id = find_shortcut(event->state & ~GDK_MOD2_MASK, 0, event->keyval);
+	kt_log_debug("Found shortcut up with id %d for state %d and key %d", id, event->state, event->keyval);
 	if (id != -1) {
 		send_key_telemetry_msg(id);
 	}
