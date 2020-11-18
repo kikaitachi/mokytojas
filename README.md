@@ -1,5 +1,7 @@
 # mokytojas
 
+IMPORTANT: this program is no longer activelly developed and [kikaitachi-ui](https://github.com/kikaitachi/kikaitachi-ui) is used instead.
+
 A robot remote control software used for [naminukas robot](https://naminukas.kikaitachi.com/).
 Here is an example of software in action:
 ![Robot remove control program](https://naminukas.kikaitachi.com/images/robot-control-program.png)
