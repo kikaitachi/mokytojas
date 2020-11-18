@@ -1,6 +1,6 @@
 # mokytojas
 
-A robot remote control software currently used for [naminukas](https://naminukas.kikaitachi.com/).
+A robot remote control software used for [naminukas robot](https://naminukas.kikaitachi.com/).
 Here is an example of software in action:
 ![Robot remove control program](https://naminukas.kikaitachi.com/images/robot-control-program.png)
 
